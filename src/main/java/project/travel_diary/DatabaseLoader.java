@@ -20,7 +20,13 @@ public class DatabaseLoader implements CommandLineRunner{
 
     @Override
     public void run(String... strings) throws Exception{
-        Place place = new Place(1.2, 2.4, "opis", new Date(), new Date());
-        this.repository.save(place);
+        Place place1 = new Place(1.2, 2.4, "opis1", new Date(), new Date());
+        Place place2 = new Place(1.3, 2.4, "opis2", new Date(), new Date());
+        Place place3 = new Place(1.4, 2.4, "opis3", new Date(), new Date());
+
+        this.repository.save(place1);
+        this.repository.save(place2);
+        this.repository.save(place3);
+
     }
 }
