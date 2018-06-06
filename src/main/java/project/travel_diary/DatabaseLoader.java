@@ -9,6 +9,7 @@ import java.util.Date;
 /**
  * Created by maciejmarzeta on 17.05.2018.
  */
+
 @Component
 public class DatabaseLoader implements CommandLineRunner{
     private final PlaceRepository repository;

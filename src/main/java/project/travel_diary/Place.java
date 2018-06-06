@@ -11,6 +11,7 @@ import java.util.Date;
 /**
  * Created by maciejmarzeta on 17.05.2018.
  */
+
 @Data
 @Entity
 public class Place {

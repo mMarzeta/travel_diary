@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * Created by maciejmarzeta on 17.05.2018.
  */
+
 @SpringBootApplication
 public class ReactAndSpringDataRestApplication {
     public static void main(String[] args){
