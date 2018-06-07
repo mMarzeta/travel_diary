@@ -1,11 +1,13 @@
 package project.travel_diary;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Version;
 import java.util.Date;
 
 /**
@@ -25,6 +27,9 @@ public class Place {
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date date_to;
+
+    private @Version @JsonIgnore Long version;
+
 
     private Place() {}
 

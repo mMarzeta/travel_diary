@@ -21,7 +21,7 @@ public class DatabaseLoader implements CommandLineRunner{
 
     @Override
     public void run(String... strings) throws Exception{
-        Place place1 = new Place(1.2, 2.4, "opis1", new Date(), new Date());
+        Place place1 = new Place(1.2, 2.4, "opis211", new Date(100), new Date(210000));
         Place place2 = new Place(1.3, 2.4, "opis2", new Date(), new Date());
         Place place3 = new Place(1.4, 2.4, "opis3", new Date(), new Date());
 
