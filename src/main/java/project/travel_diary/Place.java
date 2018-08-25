@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.Version;
+import javax.persistence.*;
 import java.util.Date;
 
 /**
@@ -40,5 +37,9 @@ public class Place {
         this.description = description;
         this.date_from = date_from;
         this.date_to = date_to;
+    }
+
+    public Long getId(){
+        return this.id;
     }
 }

@@ -7,6 +7,8 @@ const when = require('when');
 const client = require('./client');
 const follow = require('./follow');
 
+const stompClient = require('./websocket-listener');
+
 const root = '/api';
 
 class App extends React.Component {
@@ -75,16 +77,7 @@ class App extends React.Component {
                 entity: newPlace,
                 headers: {'Content-Type': 'application/json'}
             })
-        }).then(response => {
-            return follow(client, root, [
-                {rel: 'places', params: {'size': this.state.pageSize}}]);
-        }).done(response => {
-            if (typeof response.entity._links.last != "undefined") {
-                this.onNavigate(response.entity._links.last.href);
-            } else {
-                this.onNavigate(response.entity._links.self.href);
-            }
-        });
+        })
     }
 
     onNavigate(navUri) {
@@ -132,6 +125,58 @@ class App extends React.Component {
         if (pageSize !== this.state.pageSize) {
             this.loadFromServer(pageSize);
         }
+    }
+
+    refreshAndGoToLastPage(message) {
+        follow(client, root, [{
+            rel: 'places',
+            params: {size: this.state.pageSize}
+        }]).done(response => {
+            if (response.entity._links.last !== undefined) {
+                this.onNavigate(response.entity._links.last.href);
+            } else {
+                this.onNavigate(response.entity._links.self.href);
+            }
+        })
+    }
+
+    refreshCurrentPage(message) {
+        follow(client, root, [{
+            rel: 'places',
+            params: {
+                size: this.state.pageSize,
+                page: this.state.page.number
+            }
+        }]).then(placesCollection => {
+            this.links = placesCollection.entity._links;
+            this.page = placesCollection.entity.page;
+
+            return placesCollection.entity._embedded.places.map(place => {
+                return client({
+                    method: 'GET',
+                    path: place._links.self.href
+                })
+            });
+        }).then(placesPromises => {
+            return when.all(placesPromises);
+        }).then(places => {
+            this.setState({
+                page: this.page,
+                places: places,
+                attributes: Object.keys(this.schema.properties),
+                pageSize: this.state.pageSize,
+                links: this.links
+            });
+        });
+    }
+
+    componentDidMount(){
+        this.loadFromServer(this.state.pageSize);
+        stompClient.register([
+            {route: '/topic/newPlace', callback: this.refreshAndGoToLastPage},
+            {route: '/topic/updatePlace', callback: this.refreshCurrentPage},
+            {route: '/topic/deletePlace', callback: this.refreshCurrentPage}
+        ]);
     }
 
     render() {
