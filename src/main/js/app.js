@@ -18,8 +18,10 @@ class App extends React.Component {
         this.state = {
             places: [],
             attributes: [],
-            pageSize: 2,
-            links: {}
+            page: 1,
+            pageSize: 6,
+            links: {},
+            loggedInManager: this.props.loggedInManager,
         };
 
         this.updatePageSize = this.updatePageSize.bind(this);
@@ -27,10 +29,8 @@ class App extends React.Component {
         this.onDelete = this.onDelete.bind(this);
         this.onNavigate = this.onNavigate.bind(this);
         this.onUpdate = this.onUpdate.bind(this);
-    }
-
-    componentDidMount() {
-        this.loadFromServer(this.state.pageSize);
+        this.refreshAndGoToLastPage = this.refreshAndGoToLastPage.bind(this);
+        this.refreshCurrentPage = this.refreshCurrentPage.bind(this);
     }
 
     loadFromServer(pageSize) {
@@ -42,19 +42,33 @@ class App extends React.Component {
                 path: placesCollection.entity._links.profile.href,
                 headers: {'Accept': 'application/schema+json'}
             }).then(schema => {
+                Object.keys(schema.entity.properties).forEach(function (property) {
+                    if (schema.entity.properties[property].hasOwnProperty('format') &&
+                        schema.entity.properties[property].format === 'uri') {
+                        delete schema.entity.properties[property];
+                    }
+                    else if (schema.entity.properties[property].hasOwnProperty('$ref')) {
+                        delete schema.entity.properties[property];
+                    }
+                });
+
                 this.schema = schema.entity;
                 this.links = placesCollection.entity._links;
                 return placesCollection;
             });
         }).then(placesCollection => {
-            return placesCollection.entity._embedded.places.map(place => client({
-                method: 'GET',
-                path: place._links.self.href
-            }));
+            this.page = placesCollection.entity.page;
+            return placesCollection.entity._embedded.places.map(place =>
+                client({
+                    method: 'GET',
+                    path: place._links.self.href
+                })
+            );
         }).then(placePromises => {
             return when.all(placePromises);
         }).done(places => {
             this.setState({
+                page: this.page,
                 places: places,
                 attributes: Object.keys(this.schema.properties),
                 pageSize: pageSize,
@@ -64,14 +78,20 @@ class App extends React.Component {
     }
 
     onDelete(place) {
-        client({method: 'DELETE', path: place.entity._links.self.href}).done(response => {
-            this.loadFromServer(this.state.pageSize);
-        });
+        client({method: 'DELETE', path: place.entity._links.self.href}
+        ).done(response => {/* let the websocket handle updating the UI */
+            },
+            response => {
+                if (response.status.code === 403) {
+                    alert('ACCESS DENIED: You are not authorized to delete ' +
+                        place.entity._links.self.href);
+                }
+            });
     }
 
     onCreate(newPlace) {
-        follow(client, root, ['places']).then(response => {
-            return client({
+        follow(client, root, ['places']).done(response => {
+            client({
                 method: 'POST',
                 path: response.entity._links.self.href,
                 entity: newPlace,
@@ -83,42 +103,52 @@ class App extends React.Component {
     onNavigate(navUri) {
         client({method: 'GET', path: navUri})
             .then(placeCollection => {
-            this.links = placeCollection.entity._links;
+                this.links = placeCollection.entity._links;
+                this.page = placeCollection.entity.page;
 
-            return placeCollection.entity._embedded.places.map(place => client({
-                method: 'GET',
-                path: place._links.self.href
-            }));
-        }).then(placePromises => {
+                return placeCollection.entity._embedded.places.map(place => client({
+                    method: 'GET',
+                    path: place._links.self.href
+                }));
+            }).then(placePromises => {
             return when.all(placePromises)
         })
-        .done(places => {
-            this.setState({
-                places: places,
-                attributes: Object.keys(this.schema.properties),
-                pageSize: this.state.pageSize,
-                links: this.links
+            .done(places => {
+                this.setState({
+                    page: this.page,
+                    places: places,
+                    attributes: Object.keys(this.schema.properties),
+                    pageSize: this.state.pageSize,
+                    links: this.links
+                });
             });
-        });
     }
 
     onUpdate(place, updatedPlace) {
-        client({
-            method: 'PUT',
-            path: place.entity._links.self.href,
-            entity: updatedPlace,
-            headers: {
-                'Content-Type': 'application/json',
-                'If-Match': place.headers.Etag
-            }
-        }).done(response => {
-            this.loadFromServer(this.state.pageSize);
-        }, response => {
-            if (response.status.code === 412) {
-                alert('DENIED: Unable to update ' +
-                    place.entity._links.self.href + '. Your copy is stale.');
-            }
-        });
+        if (place.entity.manager.name == this.state.loggedInManager) {
+            updatedPlace["manager"] = place.entity.manager;
+            client({
+                method: 'PUT',
+                path: place.entity._links.self.href,
+                entity: updatedPlace,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'If-Match': place.headers.Etag
+                }
+            }).done(response => {
+            }, response => {
+                if (response.status.code === 403) {
+                    alert('ACCESS DENIED: You are not authorized to update ' +
+                        place.entity._links.self.href);
+                }
+                if (response.status.code === 412) {
+                    alert('DENIED: Unable to update ' + place.entity._links.self.href +
+                        '. Your copy is stale.');
+                }
+            });
+        } else {
+            alert("You are not authorized to update.")
+        }
     }
 
     updatePageSize(pageSize) {
@@ -170,7 +200,7 @@ class App extends React.Component {
         });
     }
 
-    componentDidMount(){
+    componentDidMount() {
         this.loadFromServer(this.state.pageSize);
         stompClient.register([
             {route: '/topic/newPlace', callback: this.refreshAndGoToLastPage},
@@ -184,7 +214,8 @@ class App extends React.Component {
             <div>
                 <CreateDialog attributes={this.state.attributes}
                               onCreate={this.onCreate}/>
-                <PlacesList places={this.state.places}
+                <PlacesList page={this.state.page}
+                            places={this.state.places}
                             attributes={this.state.attributes}
                             links={this.state.links}
                             pageSize={this.state.pageSize}
@@ -192,6 +223,7 @@ class App extends React.Component {
                             onDelete={this.onDelete}
                             updatePageSize={this.updatePageSize}
                             onUpdate={this.onUpdate}
+                            loggedInManager={this.state.loggedInManager}
 
                 />
             </div>
@@ -270,7 +302,7 @@ class UpdateDialog extends React.Component {
 
     render() {
         var inputs = this.props.attributes.map(attribute =>
-            <p key={attribute}>
+            <p key={this.props.place.entity[attribute]}>
                 <input type="text" placeholder={attribute}
                        defaultValue={this.props.place.entity[attribute]}
                        ref={attribute} className="field"/>
@@ -279,26 +311,37 @@ class UpdateDialog extends React.Component {
 
         var dialogId = "updatePlace-" + this.props.place.entity._links.self.href;
 
-        return (
-            <div key={this.props.place.entity._links.self.href}>
-                <a href={"#" + dialogId}>Update</a>
-                <div id={dialogId} className="modalDialog">
-                    <div>
-                        <a href="#" title="Close" className="close">X</a>
+        let isManagerCorrect = this.props.place.entity.manager.name == this.props.loggedInManager;
 
-                        <h2>Update place</h2>
+        if (isManagerCorrect == false) {
+            return (
+                <div>
+                    <a>Not your place</a>
+                </div>
+            )
+        } else {
+            return (
+                <div>
+                    <a href={"#" + dialogId}>Update</a>
+                    <div id={dialogId} className="modalDialog">
+                        <div>
+                            <a href="#" title="Close" className="close">X</a>
 
-                        <form>
-                            {inputs}
-                            <button onClick={this.handleSubmit}>Update</button>
-                        </form>
+                            <h2>Update place</h2>
+
+                            <form>
+                                {inputs}
+                                <button onClick={this.handleSubmit}>Update</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
-        )
+            )
+        }
     }
 
-};
+}
+;
 
 class PlacesList extends React.Component {
     constructor(props) {
@@ -348,6 +391,7 @@ class PlacesList extends React.Component {
                    attributes={this.props.attributes}
                    onDelete={this.props.onDelete}
                    onUpdate={this.props.onUpdate}
+                   loggedInManager={this.props.loggedInManager}
             />
         );
         var navLinks = [];
@@ -374,6 +418,7 @@ class PlacesList extends React.Component {
                         <th>Description</th>
                         <th>Date from:</th>
                         <th>Date to:</th>
+                        <th>Owner</th>
                     </tr>
                     {places}
                     </tbody>
@@ -406,13 +451,16 @@ class Place extends React.Component {
                 <td>{this.props.place.entity.description}</td>
                 <td>{this.props.place.entity.date_from}</td>
                 <td>{this.props.place.entity.date_to}</td>
+                <td>{this.props.place.entity.manager.name}</td>
                 <td>
                     <UpdateDialog place={this.props.place}
                                   attributes={this.props.attributes}
-                                  onUpdate={this.props.onUpdate}/>
+                                  onUpdate={this.props.onUpdate}
+                                  loggedInManager={this.props.loggedInManager}
+                    />
                 </td>
                 <td>
-                    <button onClick={this.handleDelete}>Delete12122</button>
+                    <button onClick={this.handleDelete}>Delete</button>
                 </td>
             </tr>
         )
@@ -420,6 +468,6 @@ class Place extends React.Component {
 }
 
 ReactDOM.render(
-    <App />,
+    <App loggedInManager={document.getElementById('managername').innerHTML}/>,
     document.getElementById('react')
 )

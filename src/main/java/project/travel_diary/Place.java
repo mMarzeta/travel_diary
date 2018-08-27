@@ -25,21 +25,28 @@ public class Place {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date date_to;
 
+    private @ManyToOne Manager manager;
+
     private @Version @JsonIgnore Long version;
 
 
     private Place() {}
 
 
-    public Place(Double x_cord, Double y_cord, String description, Date date_from, Date date_to) {
+    public Place(Double x_cord, Double y_cord, String description, Date date_from, Date date_to, Manager manager) {
         this.x_cord = x_cord;
         this.y_cord = y_cord;
         this.description = description;
         this.date_from = date_from;
         this.date_to = date_to;
+        this.manager = manager;
     }
 
-    public Long getId(){
-        return this.id;
+    public void setManager(Manager manager) {
+        this.manager = manager;
     }
+//
+//    public Long getId(){
+//        return this.id;
+//    }
 }
