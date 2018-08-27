@@ -81,19 +81,17 @@
 				<groupId>com.heroku.sdk</groupId>
 				<artifactId>heroku-maven-plugin</artifactId>
 				<version>2.0.6</version>
+				<configuration>
+					<processTypes>
+						<web>java $JAVA_OPTS -cp target/classes/project/travel_diary:target/dependency/project/travel_diary:* ReactAndSpringDataRestApplication</web>
+					</processTypes>
+				</configuration>
 			</plugin>
 			<!-- tag::frontend-maven-plugin[] -->
 			<plugin>
-				<groupId>project.travel_diary</groupId>
+				<groupId>com.github.eirslett</groupId>
 				<artifactId>frontend-maven-plugin</artifactId>
 				<version>1.2</version>
-
-				<configuration>
-					<installDirectory>target</installDirectory>
-					<processTypes>
-						<web>java $JAVA_OPTS -cp target/classes:target/dependency/* ReactAndSpringDataRestApplication</web>
-					</processTypes>
-				</configuration>
 
 				<executions>
 					<execution>
