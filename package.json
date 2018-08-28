@@ -13,7 +13,8 @@
     "stompjs": "^2.3.3"
   },
   "scripts": {
-    "watch": "webpack --watch -d"
+    "watch": "webpack --watch -d",
+    "start": "webpack -d"
   },
   "devDependencies": {
     "babel-core": "^6.18.2",
